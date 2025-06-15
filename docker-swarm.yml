@@ -1,0 +1,43 @@
+version: '3'
+services:
+  battleboat:
+    image: dockjulien/fake-backend:latest
+    deploy:
+      mode: global
+    ports:
+      - "80:3000"
+    networks:
+      - over281003
+    links:
+      - db281003
+    volumes:
+      - ./battleboat:/etc/backend/static
+    restart: always
+    environment:
+      - DATABASE_HOST=gamebattleboat
+      - DATABASE_PORT=3306
+      - DATABASE_USER=battleuser
+      - DATABASE_PASSWORD=battlepass
+      - DATABASE_NAME=battleboat
+  db281003:
+    image: mysql:5.7
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpwd281003
+      - MYSQL_DATABASE=battleboat
+      - MYSQL_USER=battleuser
+      - MYSQL_PASSWORD=battlepass
+    restart: on-failure
+    deploy:
+      mode: replicated
+      replicas: 3
+      placement:
+        constraints:
+          - node.role == worker
+    volumes:
+      - mysql_config:/var/lib/mysql
+volumes:
+  mysql_config:
+networks:
+  over281003:
+    driver: overlay
+
