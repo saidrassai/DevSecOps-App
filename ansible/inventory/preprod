@@ -1,0 +1,9 @@
+[preprod]
+preprod-server-1 ansible_host=10.0.2.10 ansible_user=ec2-user
+preprod-server-2 ansible_host=10.0.2.11 ansible_user=ec2-user
+
+[preprod:vars]
+environment=preprod
+docker_compose_file=docker-compose.preprod.yml
+app_port=8081
+db_port=3306

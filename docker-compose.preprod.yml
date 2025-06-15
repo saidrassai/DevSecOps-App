@@ -1,0 +1,52 @@
+version: '3.8'
+services:
+  devsecops-app-preprod:
+    image: devsecops-app:latest-preprod
+    ports:
+      - "8081:3000"
+    links:
+      - db-preprod
+    volumes:
+      - ./battleboat:/etc/backend/static
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=staging
+      - DATABASE_HOST=db-preprod
+      - DATABASE_PORT=3306
+      - DATABASE_USER=battleuser
+      - DATABASE_PASSWORD=battlepass_preprod
+      - DATABASE_NAME=battleboat_preprod
+      - LOG_LEVEL=info
+    networks:
+      - preprod-network
+    
+  db-preprod:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpwd_preprod_secure
+      - MYSQL_DATABASE=battleboat_preprod
+      - MYSQL_USER=battleuser
+      - MYSQL_PASSWORD=battlepass_preprod
+    restart: unless-stopped
+    volumes:
+      - mysql_preprod_data:/var/lib/mysql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - preprod-network
+
+  # Add monitoring for preprod
+  monitoring:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    networks:
+      - preprod-network
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+
+volumes: 
+  mysql_preprod_data:
+
+networks:
+  preprod-network:
+    driver: bridge

@@ -1,0 +1,44 @@
+version: '3.8'
+services:
+  devsecops-app-dev:
+    image: devsecops-app:latest-dev
+    ports:
+      - "8080:3000"
+    links:
+      - db-dev
+    volumes:
+      - ./battleboat:/etc/backend/static
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - DATABASE_HOST=db-dev
+      - DATABASE_PORT=3306
+      - DATABASE_USER=battleuser
+      - DATABASE_PASSWORD=battlepass
+      - DATABASE_NAME=battleboat_dev
+      - LOG_LEVEL=debug
+    networks:
+      - dev-network
+    
+  db-dev:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpwd_dev
+      - MYSQL_DATABASE=battleboat_dev
+      - MYSQL_USER=battleuser
+      - MYSQL_PASSWORD=battlepass
+    restart: unless-stopped
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - dev-network
+    ports:
+      - "3306:3306"  # Exposed for development debugging
+
+volumes: 
+  mysql_dev_data:
+
+networks:
+  dev-network:
+    driver: bridge

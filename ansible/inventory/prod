@@ -1,0 +1,14 @@
+[prod]
+prod-server-1 ansible_host=10.0.3.10 ansible_user=ec2-user
+prod-server-2 ansible_host=10.0.3.11 ansible_user=ec2-user
+prod-server-3 ansible_host=10.0.3.12 ansible_user=ec2-user
+
+[prod:vars]
+environment=prod
+docker_compose_file=docker-compose.prod.yml
+app_port=80
+db_port=3306
+
+[load_balancers]
+prod-lb-1 ansible_host=10.0.3.20 ansible_user=ec2-user
+prod-lb-2 ansible_host=10.0.3.21 ansible_user=ec2-user

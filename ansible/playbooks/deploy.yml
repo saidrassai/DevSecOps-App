@@ -1,0 +1,120 @@
+---
+- name: Deploy DevSecOps Application
+  hosts: all
+  become: yes
+  vars:
+    app_name: devsecops-app
+    app_dir: /opt/{{ app_name }}
+    
+  tasks:
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
+        
+    - name: Install Docker
+      yum:
+        name: docker
+        state: present
+      when: ansible_os_family == "RedHat"
+        
+    - name: Install Docker (Ubuntu/Debian)
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+        
+    - name: Install Docker Compose
+      pip:
+        name: docker-compose
+        state: present
+        
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+        
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+        
+    - name: Copy application files
+      synchronize:
+        src: "../../"
+        dest: "{{ app_dir }}/"
+        delete: yes
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=ansible"
+          - "--exclude=vendor"
+          
+    - name: Pull Docker images
+      docker_image:
+        name: "{{ docker_image }}:{{ docker_tag }}"
+        source: pull
+        
+    - name: Stop existing containers
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        files:
+          - "{{ docker_compose_file }}"
+        state: absent
+      ignore_errors: yes
+      
+    - name: Start application containers
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        files:
+          - "{{ docker_compose_file }}"
+        state: present
+        pull: yes
+        
+    - name: Wait for application to be ready
+      uri:
+        url: "http://localhost:{{ app_port }}/health"
+        method: GET
+        status_code: 200
+      retries: 30
+      delay: 10
+      
+    - name: Configure log rotation
+      copy:
+        dest: /etc/logrotate.d/{{ app_name }}
+        content: |
+          {{ app_dir }}/logs/*.log {
+            daily
+            missingok
+            rotate 14
+            compress
+            notifempty
+            copytruncate
+          }
+          
+    - name: Setup monitoring (Prometheus node exporter)
+      docker_container:
+        name: node_exporter
+        image: prom/node-exporter:latest
+        ports:
+          - "9100:9100"
+        restart_policy: unless-stopped
+        volumes:
+          - "/proc:/host/proc:ro"
+          - "/sys:/host/sys:ro"
+          - "/:/rootfs:ro"
+        command:
+          - '--path.procfs=/host/proc'
+          - '--path.rootfs=/rootfs'
+          - '--path.sysfs=/host/sys'
+          - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      when: environment != "dev"
+      
+  handlers:
+    - name: restart docker
+      systemd:
+        name: docker
+        state: restarted

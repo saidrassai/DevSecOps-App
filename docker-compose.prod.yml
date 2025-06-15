@@ -1,0 +1,102 @@
+version: '3.8'
+services:
+  devsecops-app-prod:
+    image: devsecops-app:latest-prod
+    ports:
+      - "80:3000"
+    links:
+      - db-prod
+    volumes:
+      - ./battleboat:/etc/backend/static
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DATABASE_HOST=db-prod
+      - DATABASE_PORT=3306
+      - DATABASE_USER=battleuser
+      - DATABASE_PASSWORD=${DB_PASSWORD_PROD}  # Use secrets
+      - DATABASE_NAME=battleboat_prod
+      - LOG_LEVEL=warn
+    networks:
+      - prod-network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+  db-prod:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD_PROD}  # Use secrets
+      - MYSQL_DATABASE=battleboat_prod
+      - MYSQL_USER=battleuser
+      - MYSQL_PASSWORD=${DB_PASSWORD_PROD}
+    restart: always
+    volumes:
+      - mysql_prod_data:/var/lib/mysql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./backups:/backups
+    networks:
+      - prod-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Production monitoring stack
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    networks:
+      - prod-network
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    networks:
+      - prod-network
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+
+  # Reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    networks:
+      - prod-network
+    depends_on:
+      - devsecops-app-prod
+
+volumes: 
+  mysql_prod_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  prod-network:
+    driver: bridge

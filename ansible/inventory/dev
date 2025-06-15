@@ -1,0 +1,9 @@
+[dev]
+dev-server-1 ansible_host=10.0.1.10 ansible_user=ec2-user
+dev-server-2 ansible_host=10.0.1.11 ansible_user=ec2-user
+
+[dev:vars]
+environment=dev
+docker_compose_file=docker-compose.dev.yml
+app_port=8080
+db_port=3306
